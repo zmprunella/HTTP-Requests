@@ -1,42 +1,45 @@
 import { useState, useEffect } from "react";
-import Error from "./Error";
 
 import Places from "./Places.jsx";
-
-const places = localStorage.getItem("places");
+import Error from "./Error.jsx";
+import { sortPlacesByDistance } from "../loc.js";
+import { fetchAvailablePlaces } from "../http.js";
 
 export default function AvailablePlaces({ onSelectPlace }) {
-  // Common to have these three below.
-  const [isFetching, setIsFetching] = useState(false); // Loading, fetching state
-  const [availablePlaces, setAvailablePlaces] = useState([]); // Data State
-  const [error, setError] = useState(); // Error state, show potential errors
+  const [isFetching, setIsFetching] = useState(false);
+  const [availablePlaces, setAvailablePlaces] = useState([]);
+  const [error, setError] = useState();
 
   useEffect(() => {
     async function fetchPlaces() {
       setIsFetching(true);
 
       try {
-        const response = await fetch("http://localhost:3000/placess");
-        const resData = await response.json();
+        const places = await fetchAvailablePlaces();
 
-        if (!response.ok) {
-          throw new Error("Failed to fetch");
-        } //200, 300 good, 400, 500 not good
-        setAvailablePlaces(resData.places);
+        navigator.geolocation.getCurrentPosition((position) => {
+          const sortedPlaces = sortPlacesByDistance(
+            places,
+            position.coords.latitude,
+            position.coords.longitude
+          );
+          setAvailablePlaces(sortedPlaces);
+          setIsFetching(false);
+        });
       } catch (error) {
         setError({
-          message: error.message || "Could not fetch places, please try agian.",
+          message:
+            error.message || "Could not fetch places, please try again later.",
         });
+        setIsFetching(false);
       }
-
-      setIsFetching(false);
     }
 
     fetchPlaces();
   }, []);
 
   if (error) {
-    return <Error title="An error occured!" message={error.message} />;
+    return <Error title="An error occurred!" message={error.message} />;
   }
 
   return (
@@ -44,7 +47,7 @@ export default function AvailablePlaces({ onSelectPlace }) {
       title="Available Places"
       places={availablePlaces}
       isLoading={isFetching}
-      loadingText="Fetching place data.."
+      loadingText="Fetching place data..."
       fallbackText="No places available."
       onSelectPlace={onSelectPlace}
     />
